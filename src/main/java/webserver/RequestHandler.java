@@ -17,7 +17,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
 
+import model.HttpStatusCode;
 import model.Request;
+import model.Response;
 import model.User;
 import util.HttpRequestUtils;
 import util.HttpRequestUtils.Pair;
@@ -43,11 +45,11 @@ public class RequestHandler extends Thread {
 
 		try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream(); BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
 			Request request = createRequest(reader);
-			byte[] body = getBody(request);
+			Response response = getResponse(request);
 
 			DataOutputStream dos = new DataOutputStream(out);
-			response200Header(dos, body.length);
-			responseBody(dos, body);
+			responseHeader(dos, response);
+			responseBody(dos, response.getContent());
 		} catch (IOException e) {
 			log.error(e.getMessage());
 		}
@@ -67,10 +69,10 @@ public class RequestHandler extends Thread {
 		request.setMethod(methodAndUrl[INDEX_METHOD]);
 		setUrlAndQueryString(request, methodAndUrl[INDEX_URL]);
 		setHeader(reader, request);
-		
+
 		if (request.getMethod().equals("POST")) {
 			String body = IOUtils.readData(reader, Integer.parseInt(request.getHeaders().get("Content-Length")));
-			request.setQueryString(HttpRequestUtils.parseQueryString(body));			
+			request.setQueryString(HttpRequestUtils.parseQueryString(body));
 		}
 
 		return request;
@@ -86,7 +88,7 @@ public class RequestHandler extends Thread {
 			Pair header = HttpRequestUtils.parseHeader(line);
 			headers.put(header.getKey(), header.getValue());
 		}
-		
+
 		request.setHeaders(headers);
 	}
 
@@ -103,21 +105,25 @@ public class RequestHandler extends Thread {
 	/**
 	 * View Resolver 우선순위 설정 필요
 	 */
-	private byte[] getBody(Request request) throws IOException {
+	private Response getResponse(Request request) throws IOException {
+		Response response = new Response();
 		if (request.getUrl().equals("/user/create")) {
 			Map<String, String> queryString = request.getQueryString();
 			User user = new User(queryString.get("userId"), queryString.get("password"), queryString.get("name"), queryString.get("email"));
-			return user.toString().getBytes();
+			response.setContent(Files.readAllBytes(new File("./webapp" + "/index.html").toPath()));
+			response.setStatus(HttpStatusCode.Found);
 		} else {
-			return Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath());
+			response.setContent(Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath()));
 		}
+
+		return response;
 	}
 
-	private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
+	private void responseHeader(DataOutputStream dos, Response response) {
 		try {
-			dos.writeBytes("HTTP/1.1 200 OK \r\n");
-			dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
-			dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+			dos.writeBytes(String.format("HTTP/1.1 %s %s \r\n", response.getStatus().getCode(), response.getStatus().toString()));
+			dos.writeBytes(response.getContentType() + "\r\n");
+			dos.writeBytes("Content-Length: " + response.getContent().length + "\r\n");
 			dos.writeBytes("\r\n");
 		} catch (IOException e) {
 			log.error(e.getMessage());
