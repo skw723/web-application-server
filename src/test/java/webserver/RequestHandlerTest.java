@@ -130,4 +130,42 @@ public class RequestHandlerTest {
 		String content = new String(response);
 		assertTrue(content.contains("Cookie: logined=false"));
 	}
+	
+	@Test
+	public void show_user_list_login() throws IOException {
+		//given
+		Socket socket = mock(Socket.class);
+		BDDMockito.given(socket.getInputStream()).willReturn(new ByteArrayInputStream("GET /user/list HTTP/1.1\nCookie: logined=true".getBytes()));
+		BDDMockito.given(socket.getOutputStream()).willReturn(new ByteArrayOutputStream());
+
+		RequestHandler handler = new RequestHandler(socket);
+
+		byte[] expectedStatus = "HTTP/1.1 200 OK".getBytes();
+		//when
+		handler.run();
+		//then
+		byte[] response = socket.getOutputStream().toString().getBytes();
+		byte[] actualStatus = new byte[expectedStatus.length];
+		System.arraycopy(response, 0, actualStatus, 0, expectedStatus.length);
+		assertArrayEquals(expectedStatus, actualStatus);
+	}
+	
+	@Test
+	public void show_user_list_nologin() throws IOException {
+		//given
+		Socket socket = mock(Socket.class);
+		BDDMockito.given(socket.getInputStream()).willReturn(new ByteArrayInputStream("GET /user/list HTTP/1.1\nCookie: logined=false".getBytes()));
+		BDDMockito.given(socket.getOutputStream()).willReturn(new ByteArrayOutputStream());
+
+		RequestHandler handler = new RequestHandler(socket);
+
+		byte[] expectedStatus = "HTTP/1.1 302 Found".getBytes();
+		//when
+		handler.run();
+		//then
+		byte[] response = socket.getOutputStream().toString().getBytes();
+		byte[] actualStatus = new byte[expectedStatus.length];
+		System.arraycopy(response, 0, actualStatus, 0, expectedStatus.length);
+		assertArrayEquals(expectedStatus, actualStatus);
+	}
 }

@@ -8,6 +8,7 @@ public class Request {
 	private Map<String, String> queryString;
 	private int contentLength;
 	private Map<String, String> headers;
+	private Map<String, String> cookies;
 
 	public String getUrl() {
 		return url;
@@ -47,5 +48,13 @@ public class Request {
 
 	public void setHeaders(Map<String, String> headers) {
 		this.headers = headers;
+	}
+
+	public Map<String, String> getCookies() {
+		return cookies;
+	}
+
+	public void setCookies(Map<String, String> cookies) {
+		this.cookies = cookies;
 	}
 }

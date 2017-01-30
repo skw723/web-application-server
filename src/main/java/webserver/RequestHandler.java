@@ -72,7 +72,7 @@ public class RequestHandler extends Thread {
 		Request request = new Request();
 		request.setMethod(methodAndUrl[INDEX_METHOD]);
 		setUrlAndQueryString(request, methodAndUrl[INDEX_URL]);
-		setHeader(reader, request);
+		setHeaderAndCookie(reader, request);
 
 		if (request.getMethod().equals("POST")) {
 			String body = IOUtils.readData(reader, Integer.parseInt(request.getHeaders().get("Content-Length")));
@@ -82,12 +82,16 @@ public class RequestHandler extends Thread {
 		return request;
 	}
 
-	private void setHeader(BufferedReader reader, Request request) throws IOException {
+	private void setHeaderAndCookie(BufferedReader reader, Request request) throws IOException {
 		String line;
 		Map<String, String> headers = new HashMap<>();
 		while ((line = reader.readLine()) != null) {
 			if (line.equals("")) {
 				break;
+			}
+			
+			if (line.startsWith("Cookie")) {
+				request.setCookies(HttpRequestUtils.parseCookies(line.split(":")[1]));
 			}
 			Pair header = HttpRequestUtils.parseHeader(line);
 			headers.put(header.getKey(), header.getValue());
@@ -142,6 +146,28 @@ public class RequestHandler extends Thread {
 			Map<String, Object> cookies = new HashMap<>();
 			cookies.put("logined", isLogined);
 			response.setCookies(cookies);
+		} else if (request.getUrl().equals("/user/list")) {
+			String logined = request.getCookies().get("logined");
+			if (Strings.isNullOrEmpty(logined)) {
+				response.setStatus(HttpStatusCode.Found);
+				Map<String, Object> headers = new HashMap<>();
+				headers.put("Location", "/index.html");
+				response.setHeaders(headers);
+			} else if (logined.equals("true")) {
+				StringBuilder content = new StringBuilder();
+				for (User user : DataBase.findAll()) {
+					content.append(user.getUserId());
+					content.append(" " + user.getName());
+					content.append(" " + user.getEmail());
+					content.append("<br/>");
+				}
+				response.setContent(content.toString().getBytes());
+			} else {
+				response.setStatus(HttpStatusCode.Found);
+				Map<String, Object> headers = new HashMap<>();
+				headers.put("Location", "/index.html");
+				response.setHeaders(headers);
+			}
 		} else {
 			response.setContent(Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath()));
 		}
@@ -165,14 +191,14 @@ public class RequestHandler extends Thread {
 
 			if (response.getCookies() != null && response.getCookies().size() > 0) {
 				StringBuilder cookie = new StringBuilder();
-				cookie.append("Cookie: ");
+				cookie.append("Set-Cookie: ");
 				for (Entry<String, Object> entry : response.getCookies().entrySet()) {
 					cookie.append(entry.getKey());
 					cookie.append("=");
 					cookie.append(entry.getValue());
-					cookie.append("; ");
+					cookie.append(";");
 				}
-				dos.writeBytes(cookie.substring(0, cookie.length() - 2) + "\r\n");
+				dos.writeBytes(cookie.substring(0, cookie.length() - 1) + "\r\n");
 			}
 			dos.writeBytes("\r\n");
 		} catch (IOException e) {
