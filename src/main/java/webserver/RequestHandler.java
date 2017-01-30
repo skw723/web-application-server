@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -19,6 +20,8 @@ import com.google.common.base.Strings;
 import model.Request;
 import model.User;
 import util.HttpRequestUtils;
+import util.HttpRequestUtils.Pair;
+import util.IOUtils;
 
 public class RequestHandler extends Thread {
 	private static final int INDEX_METHOD = 0;
@@ -39,7 +42,7 @@ public class RequestHandler extends Thread {
 		log.debug("New Client Connect! Connected IP : {}, Port : {}", connection.getInetAddress(), connection.getPort());
 
 		try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream(); BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
-			Request request = createRequest(reader.readLine());
+			Request request = createRequest(reader);
 			byte[] body = getBody(request);
 
 			DataOutputStream dos = new DataOutputStream(out);
@@ -50,21 +53,41 @@ public class RequestHandler extends Thread {
 		}
 	}
 
-	private Request createRequest(String line) {
-		if (Strings.isNullOrEmpty(line)) {
-			throw new IllegalStateException("invalid request: empty request info");
+	private Request createRequest(BufferedReader reader) throws IOException {
+		String firstLine = reader.readLine();
+		if (Strings.isNullOrEmpty(firstLine)) {
+			throw new IllegalStateException("invalid request: request is empty");
 		}
-		
-		String[] methodAndUrl = line.split(" ");
+		String[] methodAndUrl = firstLine.split(" ");
 		if (methodAndUrl.length < MINIMUM_COUNT) {
 			throw new IllegalStateException("invalid request: request url is required");
 		}
-		
+
 		Request request = new Request();
 		request.setMethod(methodAndUrl[INDEX_METHOD]);
 		setUrlAndQueryString(request, methodAndUrl[INDEX_URL]);
+		setHeader(reader, request);
 		
+		if (request.getMethod().equals("POST")) {
+			String body = IOUtils.readData(reader, Integer.parseInt(request.getHeaders().get("Content-Length")));
+			request.setQueryString(HttpRequestUtils.parseQueryString(body));			
+		}
+
 		return request;
+	}
+
+	private void setHeader(BufferedReader reader, Request request) throws IOException {
+		String line;
+		Map<String, String> headers = new HashMap<>();
+		while ((line = reader.readLine()) != null) {
+			if (line.equals("")) {
+				break;
+			}
+			Pair header = HttpRequestUtils.parseHeader(line);
+			headers.put(header.getKey(), header.getValue());
+		}
+		
+		request.setHeaders(headers);
 	}
 
 	private void setUrlAndQueryString(Request request, String url) {
@@ -86,7 +109,7 @@ public class RequestHandler extends Thread {
 			User user = new User(queryString.get("userId"), queryString.get("password"), queryString.get("name"), queryString.get("email"));
 			return user.toString().getBytes();
 		} else {
-			return Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath());			
+			return Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath());
 		}
 	}
 
