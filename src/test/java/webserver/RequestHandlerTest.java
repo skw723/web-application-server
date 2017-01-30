@@ -168,4 +168,20 @@ public class RequestHandlerTest {
 		System.arraycopy(response, 0, actualStatus, 0, expectedStatus.length);
 		assertArrayEquals(expectedStatus, actualStatus);
 	}
+	
+	@Test
+	public void response_css() throws IOException {
+		//given
+		Socket socket = mock(Socket.class);
+		BDDMockito.given(socket.getInputStream()).willReturn(new ByteArrayInputStream("GET /css/styles.css HTTP/1.1".getBytes()));
+		BDDMockito.given(socket.getOutputStream()).willReturn(new ByteArrayOutputStream());
+
+		RequestHandler handler = new RequestHandler(socket);
+
+		//when
+		handler.run();
+		//then
+		String response = socket.getOutputStream().toString();
+		assertTrue(response.contains("text/css"));
+	}
 }

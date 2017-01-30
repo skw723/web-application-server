@@ -171,6 +171,10 @@ public class RequestHandler extends Thread {
 		} else {
 			response.setContent(Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath()));
 		}
+		
+		if (request.getUrl().endsWith(".css")) {
+			response.setContentType("Content-Type: text/css;charset=utf-8");
+		}
 
 		return response;
 	}
