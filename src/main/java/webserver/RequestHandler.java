@@ -11,12 +11,14 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
 
+import db.DataBase;
 import model.HttpStatusCode;
 import model.Request;
 import model.Response;
@@ -49,7 +51,9 @@ public class RequestHandler extends Thread {
 
 			DataOutputStream dos = new DataOutputStream(out);
 			responseHeader(dos, response);
-			responseBody(dos, response.getContent());
+			if (response.getContent() != null && response.getContent().length > 0) {
+				responseBody(dos, response.getContent());
+			}
 		} catch (IOException e) {
 			log.error(e.getMessage());
 		}
@@ -110,8 +114,34 @@ public class RequestHandler extends Thread {
 		if (request.getUrl().equals("/user/create")) {
 			Map<String, String> queryString = request.getQueryString();
 			User user = new User(queryString.get("userId"), queryString.get("password"), queryString.get("name"), queryString.get("email"));
-			response.setContent(Files.readAllBytes(new File("./webapp" + "/index.html").toPath()));
+			DataBase.addUser(user);
 			response.setStatus(HttpStatusCode.Found);
+
+			Map<String, Object> headers = new HashMap<>();
+			headers.put("Location", "/index.html");
+			response.setHeaders(headers);
+		} else if (request.getUrl().equals("/user/login")) {
+			String userId = request.getQueryString().get("userId");
+			String password = request.getQueryString().get("password");
+			User user = DataBase.findUserById(userId);
+			boolean isLogined = false;
+			if (user == null) {
+				response.setContent(Files.readAllBytes(new File("./webapp/user/login_failed.html").toPath()));
+			} else if (user.getPassword().equals(password)) {
+				isLogined = true;
+				response.setStatus(HttpStatusCode.Found);
+				response.setContent(Files.readAllBytes(new File("./webapp/index.html").toPath()));
+				
+				Map<String, Object> headers = new HashMap<>();
+				headers.put("Location", "/index.html");
+				response.setHeaders(headers);
+			} else {
+				response.setContent(Files.readAllBytes(new File("./webapp/user/login_failed.html").toPath()));
+			}
+
+			Map<String, Object> cookies = new HashMap<>();
+			cookies.put("logined", isLogined);
+			response.setCookies(cookies);
 		} else {
 			response.setContent(Files.readAllBytes(new File("./webapp" + request.getUrl()).toPath()));
 		}
@@ -123,7 +153,27 @@ public class RequestHandler extends Thread {
 		try {
 			dos.writeBytes(String.format("HTTP/1.1 %s %s \r\n", response.getStatus().getCode(), response.getStatus().toString()));
 			dos.writeBytes(response.getContentType() + "\r\n");
-			dos.writeBytes("Content-Length: " + response.getContent().length + "\r\n");
+			if (response.getContent() != null && response.getContent().length > 0) {
+				dos.writeBytes("Content-Length: " + response.getContent().length + "\r\n");
+			}
+
+			if (response.getHeaders() != null && response.getHeaders().size() > 0) {
+				for (Entry<String, Object> entry : response.getHeaders().entrySet()) {
+					dos.writeBytes(entry.getKey() + ": " + entry.getValue() + "\r\n");
+				}
+			}
+
+			if (response.getCookies() != null && response.getCookies().size() > 0) {
+				StringBuilder cookie = new StringBuilder();
+				cookie.append("Cookie: ");
+				for (Entry<String, Object> entry : response.getCookies().entrySet()) {
+					cookie.append(entry.getKey());
+					cookie.append("=");
+					cookie.append(entry.getValue());
+					cookie.append("; ");
+				}
+				dos.writeBytes(cookie.substring(0, cookie.length() - 2) + "\r\n");
+			}
 			dos.writeBytes("\r\n");
 		} catch (IOException e) {
 			log.error(e.getMessage());
