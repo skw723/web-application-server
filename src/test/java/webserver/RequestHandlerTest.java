@@ -50,7 +50,7 @@ public class RequestHandlerTest {
 
 		RequestHandler handler = new RequestHandler(socket);
 
-		byte[] expectedStatus = "HTTP/1.1 302 Found".getBytes();
+		byte[] expectedStatus = "HTTP/1.1 405 Method Not Allowed".getBytes();
 		//when
 		handler.run();
 		//then
@@ -92,18 +92,12 @@ public class RequestHandlerTest {
 		BDDMockito.given(socket.getOutputStream()).willReturn(new ByteArrayOutputStream());
 
 		RequestHandler handler = new RequestHandler(socket);
-
-		byte[] expected = Files.readAllBytes(new File("./webapp/index.html").toPath());
-
 		DataBase.addUser(new User(id, password, null, null));
 		//when
 		handler.run();
 		DataBase.removeUserById(id);
 		//then
 		byte[] response = socket.getOutputStream().toString().getBytes();
-		byte[] actual = new byte[expected.length];
-		System.arraycopy(response, response.length - expected.length, actual, 0, expected.length);
-		assertArrayEquals(expected, actual);
 		String content = new String(response);
 		assertTrue(content.contains("Cookie: logined=true"));
 	}
@@ -127,8 +121,6 @@ public class RequestHandlerTest {
 		byte[] actual = new byte[expected.length];
 		System.arraycopy(response, response.length - expected.length, actual, 0, expected.length);
 		assertArrayEquals(expected, actual);
-		String content = new String(response);
-		assertTrue(content.contains("Cookie: logined=false"));
 	}
 	
 	@Test
