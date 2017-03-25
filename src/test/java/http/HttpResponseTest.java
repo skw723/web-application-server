@@ -1,11 +1,11 @@
 package http;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
+import java.io.*;
 
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class HttpResponseTest {
     private String testDirectory = "./src/test/resources/";
@@ -31,5 +31,16 @@ public class HttpResponseTest {
 
     private OutputStream createOutputStream(String filename) throws FileNotFoundException {
         return new FileOutputStream(new File(testDirectory + filename));
+    }
+
+    @Test
+    public void responseSetCookie() throws FileNotFoundException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        HttpResponse response = new HttpResponse(bos);
+        response.addCookie("cookie1", "value");
+        response.sendRedirect("/index.html");
+
+        assertEquals("value", response.getCookie("cookie1"));
+        assertTrue(bos.toString().contains("Set-Cookie: cookie1=value"));
     }
 }

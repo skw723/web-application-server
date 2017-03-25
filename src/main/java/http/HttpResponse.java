@@ -19,6 +19,8 @@ public class HttpResponse {
 
     private Map<String, String> headers = new HashMap<String, String>();
 
+    private Map<String, String> cookies = new HashMap<>();
+
     public HttpResponse(OutputStream out) {
         dos = new DataOutputStream(out);
     }
@@ -90,6 +92,45 @@ public class HttpResponse {
             for (String key : keys) {
                 dos.writeBytes(key + ": " + headers.get(key) + " \r\n");
             }
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+
+        processCookies();
+    }
+
+    public String addCookie(String name, String value) {
+        return cookies.put(name, value);
+    }
+
+    public String getCookie(String name) {
+        return cookies.get(name);
+    }
+
+    public String removeCookie(String name) {
+        return cookies.remove(name);
+    }
+
+
+    private void processCookies() {
+        if (cookies.isEmpty()) {
+            return;
+        }
+
+        try {
+            StringBuilder cookieValue = new StringBuilder();
+            cookieValue.append("Set-Cookie: ");
+
+            Set<String> keys = cookies.keySet();
+            for (String key : keys) {
+                cookieValue.append(key);
+                cookieValue.append("=");
+                cookieValue.append(cookies.get(key));
+                cookieValue.append(";");
+            }
+
+            cookieValue.substring(0, cookieValue.length() - 1);
+            dos.writeBytes(cookieValue.toString());
         } catch (IOException e) {
             log.error(e.getMessage());
         }
